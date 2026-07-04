@@ -144,21 +144,21 @@ if st.button("Calculate"):
 
     to_write.append(f"**Compulsory insurance:** {response.insurance:,.0f} VND\n\n")
 
+    to_write.append(f"**Taxable income:** {response.taxable_income:,.0f} VND\n\n")
+    to_write.append(f"**PIT:** {response.pit_tax:,.0f} VND\n\n")
+
+    to_write.append(f"**Effective tax bracket:** {response.pit_tax_percent if response.pit_tax_percent else 0}%\n\n")
+
+    to_write.append(f"**Net salary:** {response.net:,.0f} VND\n\n")
+
     if response.personal_deduction:
         to_write.append(f"**Tax saved from personal deduction:** {response.personal_deduction:,.0f} VND\n\n")
 
     if response.dependent_deduction:
         to_write.append(f"**Tax saved from child deduction:** {response.dependent_deduction:,.0f} VND\n\n")
 
-    to_write.append(f"**Taxable income:** {response.taxable_income:,.0f} VND\n\n")
-    to_write.append(f"**PIT:** {response.pit_tax:,.0f} VND\n\n")
+    to_write.append(f"**Expenses applied:** {response.pit_tax + response.insurance:,.0f} VND\n\n")
 
-    to_write.append(f"**Effective tax bracket:** {response.pit_tax_percent if response.pit_tax_percent else 0}%\n\n")
-
-    to_write.append(
-        f"**Net salary:** {response.net:,.0f} VND\n\n"
-        f"**Expenses applied:** {response.pit_tax + response.insurance:,.0f} VND\n\n"
-    )
 
     st.success(
         "".join(to_write)
