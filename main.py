@@ -1,17 +1,33 @@
 from insurance import count_mandatory_social_insurance
 from deductions import apply_personal_deduction, apply_dependency_deduction
-from pit import calculate_pit
+from pit import calculate_pit_old
 from dataclasses import dataclass
 
 
 @dataclass
 class TaxableInfoResponse:
-    insurance: int | float  = None
+    salary_base: int | float = None
+    gross_salary: int | float = None
+    insurance: int | float = None
     taxable_income: int | float = None
+    pit_tax_percent: int | float = None
     pit_tax: int | float = None
     net: int | float = None
     dependent_deduction: int | float | None = None
     personal_deduction: int | float = None
+
+    def to_dict(self):
+        return {
+            "salary_base": self.salary_base,
+            "gross_salary": self.gross_salary,
+            "insurance": self.insurance,
+            "taxable_income": self.taxable_income,
+            "pit_tax_percent": self.pit_tax_percent,
+            "pit_tax": self.pit_tax,
+            "net": self.net,
+            "dependent_deduction": self.dependent_deduction,
+            "personal_deduction": self.personal_deduction
+        }
 
 
 # -------------------------------
@@ -26,43 +42,53 @@ class TaxCounter:
 
     @classmethod
     def calculate_net(
-            cls,
-            salary_base: int | float,
-            gross_salary: int,
-            dependency_deduction_applied: bool,  # for a kid
-            personal_deduction_applied=True  # default by the gov of vietnam
+        cls,
+        salary_base: int | float,
+        gross_salary: int,
+        dependency_deduction_applied: bool,  # for a kid
+        is_vietnamese: bool = False,
+        personal_deduction_applied=True,  # default by the gov of vietnam,
+        number_of_children_to_apply_deduction: int = 0
+
     ) -> TaxableInfoResponse:
 
         response = TaxableInfoResponse()
+        response.salary_base = salary_base
+        response.gross_salary = gross_salary
 
-        insurance = count_mandatory_social_insurance(salary_base=salary_base)
-        response.insurance = insurance
-
-        total_gross = gross_salary - insurance  # Salary before tax
+        response: TaxableInfoResponse = count_mandatory_social_insurance(response=response, is_vietnamese=is_vietnamese)
 
         if personal_deduction_applied:
-            personal_deduction = apply_personal_deduction(salary=total_gross)
-            response.personal_deduction = personal_deduction
+            response: TaxableInfoResponse = apply_personal_deduction(response=response)
 
-            total_gross = personal_deduction
-
-            if total_gross <= 0:
-                response.pit_tax = 0
-                response.net = total_gross
-                return response  # salaries lower than PERSONAL_DEDUCTION are not taxed
+            if response.taxable_income == 0:
+                return response
 
         if dependency_deduction_applied:
-            dependency_deduction = apply_dependency_deduction(salary=total_gross)
-            response.dependent_deduction = dependency_deduction
+            response: TaxableInfoResponse = apply_dependency_deduction(
+                response=response,
+                number_of_children_to_apply_deduction=number_of_children_to_apply_deduction
+            )
 
-            if total_gross <= 0:
-                response.pit_tax = 0
-                response.net = total_gross
-                return response  # nothing left to tax
+            if response.taxable_income == 0:
+                return response
 
-        pit_tax = calculate_pit(salary_after_deductions=total_gross)
-        response.pit_tax = pit_tax
-        response.net = total_gross - response.net
+        response = calculate_pit_old(response=response)
+        return cls.enrich_metadata(response=response)
+
+    @staticmethod
+    def enrich_metadata(response: TaxableInfoResponse):
+        tax_rate = response.pit_tax_percent / 100
+
+        if response.personal_deduction:
+            response.personal_deduction = round(
+                response.personal_deduction * tax_rate
+            )
+
+        if response.dependent_deduction:
+            response.dependent_deduction = round(
+                response.dependent_deduction * tax_rate
+            )
 
         return response
 
@@ -76,9 +102,11 @@ if __name__ == '__main__':
     response = taxCounter.calculate_net(
         salary_base=salary_base_to_test,
         gross_salary=salary_to_test,
-        dependency_deduction_applied=False
+        dependency_deduction_applied=True,
+        is_vietnamese=True,
+        number_of_children_to_apply_deduction=1
     )
 
-    print("Gross:", salary_to_test)
-    print("Net:", response.net)
-    print("Was taxed:", salary_to_test - response.net)
+    import pprint
+
+    pprint.pprint(response.to_dict())
