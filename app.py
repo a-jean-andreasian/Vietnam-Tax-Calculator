@@ -1,11 +1,93 @@
 import streamlit as st
 from main import TaxCounter
 from typing import TYPE_CHECKING
+from PIL import Image
+import base64
 
 if TYPE_CHECKING:
     from main import TaxableInfoResponse
 
 TAX_COUNTER = TaxCounter()
+
+
+def set_page_styling():
+    with open("bin/background.png", "rb") as f:
+        data = base64.b64encode(f.read()).decode()
+
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{data}");
+            background-size: cover;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <style>
+    
+        /* Global page text */
+        .stApp,
+        p,
+        label,
+        h1,h2,h3,h4,h5,h6 {
+            color: black !important;
+        }
+    
+        /* Buttons */
+        .stButton > button {
+            background-color: #1e1e2f !important;
+            color: white !important;
+            border: none !important;
+        }
+    
+        .stButton > button p {
+            color: white !important;
+        }
+    
+        /* Number input field */
+        .stNumberInput input {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
+        }
+    
+        /* +/- buttons */
+        .stNumberInput button {
+            color: white !important;
+        }
+    
+        /* Expander header */
+        .streamlit-expanderHeader p {
+            color: white !important;
+        }
+    
+        /* Checkbox labels */
+        .stCheckbox p {
+            color: black !important;
+        }
+    
+        /* Selectbox */
+        div[data-baseweb="select"] * {
+            color: white !important;
+        }
+    
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.set_page_config(
+        page_title="Vietnam PIT Calculator",
+        page_icon=Image.open("bin/icon.png"),
+        layout="centered"
+    )
+
+
+set_page_styling()
 
 st.title("Vietnam PIT Calculator")
 
@@ -40,13 +122,12 @@ apply_dependents = st.checkbox(
 
 dependents = 0  # preventing NameError: name 'dependents' is not defined
 if apply_dependents:
-    with st.expander("Dependents settings", expanded=True):
-        dependents = st.number_input(
-            "Children claimed as dependents",
-            min_value=1,
-            value=1,
-            step=1
-        )
+    dependents = st.number_input(
+        "Children claimed as dependents",
+        min_value=1,
+        value=1,
+        step=1
+    )
 
 if st.button("Calculate"):
     response: "TaxableInfoResponse" = TAX_COUNTER.calculate_net(
@@ -59,40 +140,26 @@ if st.button("Calculate"):
     )
 
     st.subheader("Results")
+    to_write = list()
 
-    st.write(
-        f"Compulsory insurance: "
-        f"{response.insurance:,.0f} VND"
-    )
+    to_write.append(f"**Compulsory insurance:** {response.insurance:,.0f} VND\n\n")
 
     if response.personal_deduction:
-        st.write(
-            f"Tax saved from personal deduction: "
-            f"{response.personal_deduction:,.0f} VND"
-        )
+        to_write.append(f"**Tax saved from personal deduction:** {response.personal_deduction:,.0f} VND\n\n")
 
     if response.dependent_deduction:
-        st.write(
-            f"Tax saved from child deduction: "
-            f"{response.dependent_deduction:,.0f} VND"
-        )
+        to_write.append(f"**Tax saved from child deduction:** {response.dependent_deduction:,.0f} VND\n\n")
 
-    st.write(
-        f"Taxable income: "
-        f"{response.taxable_income:,.0f} VND"
-    )
+    to_write.append(f"**Taxable income:** {response.taxable_income:,.0f} VND\n\n")
+    to_write.append(f"**PIT:** {response.pit_tax:,.0f} VND\n\n")
 
-    st.write(
-        f"PIT: "
-        f"{response.pit_tax:,.0f} VND"
-    )
+    to_write.append(f"**Effective tax bracket:** {response.pit_tax_percent if response.pit_tax_percent else 0}%\n\n")
 
-    st.write(
-        f"Effective tax bracket: "
-        f"{response.pit_tax_percent if response.pit_tax_percent else 0}%"
+    to_write.append(
+        f"**Net salary:** {response.net:,.0f} VND\n\n"
+        f"**Expenses applied:** {response.pit_tax + response.insurance:,.0f} VND\n\n"
     )
 
     st.success(
-        f"Net salary: {response.net:,.0f} VND\n\n"
-        f"Expenses applied: {response.pit_tax + response.insurance:,.0f} VND"
+        "".join(to_write)
     )
